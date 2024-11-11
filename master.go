@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/charmbracelet/bubbles/progress"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/ssh"
@@ -167,24 +169,38 @@ func (m masterView) View() string {
 	state.mu.RLock()
 	defer state.mu.RUnlock()
 
-	s := "🎲 Scrum Poker Master View\n\n"
+	labelStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color(catppuccinMauve)).
+		PaddingRight(2)
+
+	countStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(catppuccinPeach)).
+		PaddingRight(1)
+
+	percentStyle := lipgloss.NewStyle().
+		Italic(true).
+		Foreground(lipgloss.Color(catppuccinSky))
+
+	var s strings.Builder
+	s.WriteString("🎲 Scrum Poker Master View\n\n")
 
 	// Show timer if active
 	if !m.endTime.IsZero() {
 		remaining := time.Until(m.endTime)
 		if remaining > 0 {
-			s += fmt.Sprintf("⏱  Timer: %02d:%02d\n\n",
+			s.WriteString(fmt.Sprintf("⏱  Timer: %02d:%02d\n\n",
 				int(remaining.Minutes()),
-				int(remaining.Seconds())%60)
+				int(remaining.Seconds())%60))
 		} else {
-			s += "⏱  Time's up!\n\n"
+			s.WriteString("⏱  Time's up!\n\n")
 		}
 	}
 
-	s += fmt.Sprintf("Connected Players: %d\n\n", len(state.players))
+	s.WriteString(fmt.Sprintf("Connected Players: %d\n\n", len(state.players)))
 
 	if len(state.players) == 0 {
-		s += "Waiting for players to join...\n"
+		s.WriteString("Waiting for players to join...\n")
 	} else {
 		// Sort players by name for consistent display
 		names := make([]string, 0, len(state.players))
@@ -203,19 +219,24 @@ func (m masterView) View() string {
 			}
 		}
 
-		s += fmt.Sprintf("Voting Progress: %d/%d\n\n", voted, len(state.players))
+		s.WriteString(fmt.Sprintf("Voting Progress: %d/%d\n\n", voted, len(state.players)))
 
 		// Display statistics when points are revealed
 		if state.revealed && voted > 0 {
 			avg, median, distribution := calculateStatistics(points)
 
-			s += "📊 Voting Statistics:\n"
-			if avg > 0 {
-				s += fmt.Sprintf("Average: %.1f\n", avg)
-			}
-			s += fmt.Sprintf("Median: %s\n", median)
+			p := progress.New(
+				progress.WithScaledGradient(catppuccinMaroon, catppuccinLavender),
+				progress.WithWidth(50),
+			)
 
-			s += "Distribution:\n"
+			s.WriteString("📊 Voting Statistics:\n")
+			if avg > 0 {
+				s.WriteString(fmt.Sprintf("Average: %.1f\n", avg))
+			}
+			s.WriteString(fmt.Sprintf("Median: %s\n", median))
+
+			s.WriteString("Distribution:\n")
 			// Sort point values for consistent display
 			pointValues := make([]string, 0, len(distribution))
 			for p := range distribution {
@@ -223,50 +244,52 @@ func (m masterView) View() string {
 			}
 			sort.Strings(pointValues)
 
-			for _, p := range pointValues {
-				count := distribution[p]
-				percentage := float64(count) / float64(voted) * 100
-				s += fmt.Sprintf("%s: %d votes (%.1f%%)", p, count, percentage)
-				// Add visual bar
-				barLength := int(percentage / 10)
-				s += " "
-				for i := 0; i < barLength; i++ {
-					s += "█"
-				}
-				s += "\n"
+			for _, pointVal := range pointValues {
+				count := distribution[pointVal]
+				percentage := float64(count) / float64(voted)
+
+				label := labelStyle.Render(pointVal + ":")
+				votes := countStyle.Render(fmt.Sprintf("%d votes", count))
+				percent := percentStyle.Render(fmt.Sprintf("(%.1f%%)", percentage*100))
+
+				// Add the point value and vote count
+				s.WriteString(fmt.Sprintf("%s %s %s\n", label, votes, percent))
+
+				// Add the progress bar
+				s.WriteString(p.ViewAs(percentage))
+				s.WriteString("\n\n")
 			}
-			s += "\n"
 		}
 
 		// Display players
-		s += "Players:\n"
+		s.WriteString("Players:\n")
 		for _, name := range names {
 			player := state.players[name]
 			if state.revealed {
-				s += fmt.Sprintf("• %s: %s\n", name, player.points)
+				s.WriteString(fmt.Sprintf("• %s: %s\n", name, player.points))
 			} else {
 				if player.selected {
-					s += fmt.Sprintf("• %s: ✓\n", name)
+					s.WriteString(fmt.Sprintf("• %s: ✓\n", name))
 				} else {
-					s += fmt.Sprintf("• %s: waiting...\n", name)
+					s.WriteString(fmt.Sprintf("• %s: waiting...\n", name))
 				}
 			}
 		}
 	}
 
-	s += "\nCommands:\n"
-	s += "r: reveal points\n"
-	s += "c: clear points\n"
-	s += "d: disconnect all\n"
-	s += "q: quit\n"
-	s += "\nTimer Commands:\n"
-	s += "1: start 1 min timer\n"
-	s += "2: start 2 min timer\n"
-	s += "3: start 3 min timer\n"
-	s += "5: start 5 min timer\n"
+	s.WriteString("\nCommands:\n")
+	s.WriteString("r: reveal points\n")
+	s.WriteString("c: clear points\n")
+	s.WriteString("d: disconnect all\n")
+	s.WriteString("q: quit\n")
+	s.WriteString("\nTimer Commands:\n")
+	s.WriteString("1: start 1 min timer\n")
+	s.WriteString("2: start 2 min timer\n")
+	s.WriteString("3: start 3 min timer\n")
+	s.WriteString("5: start 5 min timer\n")
 
 	// Add timestamp for refresh indication
-	s += fmt.Sprintf("\nLast updated: %s", time.Now().Format("15:04:05"))
+	s.WriteString(fmt.Sprintf("\nLast updated: %s", time.Now().Format("15:04:05")))
 
-	return lipgloss.NewStyle().Padding(1).Render(s)
+	return lipgloss.NewStyle().Padding(1).Render(s.String())
 }

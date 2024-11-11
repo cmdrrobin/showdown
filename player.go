@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -63,15 +64,16 @@ func (p playerView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (p playerView) View() string {
-	s := fmt.Sprintf("🎲 Scrum Poker - Player: %s\n\n", p.name)
-	s += p.list.View() + "\n\n"
+	var s strings.Builder
+	s.WriteString(fmt.Sprintf("🎲 Scrum Poker - Player: %s\n\n", p.name))
+	s.WriteString(p.list.View() + "\n\n")
 
 	if p.selected != "" {
-		s += fmt.Sprintf("Selected: %s\n", p.selected)
+		s.WriteString(fmt.Sprintf("Selected: %s\n", p.selected))
 	}
 
-	s += "\nPress q to quit"
-	return lipgloss.NewStyle().Padding(1).Render(s)
+	s.WriteString("\nPress q to quit")
+	return lipgloss.NewStyle().Padding(1).Render(s.String())
 }
 
 func initPlayerView(playerName string, session ssh.Session) (tea.Model, tea.Cmd) {
@@ -85,8 +87,8 @@ func initPlayerView(playerName string, session ssh.Session) (tea.Model, tea.Cmd)
 	l.SetShowTitle(true)
 	l.SetFilteringEnabled(false)
 	l.Styles.Title = lipgloss.NewStyle().
-		Background(lipgloss.Color("62")).
-		Foreground(lipgloss.Color("230")).
+		Background(lipgloss.Color(catppuccinSky)).
+		Foreground(lipgloss.Color(catppuccinCrust)).
 		Padding(0, 1)
 
 	p := playerView{
@@ -150,12 +152,12 @@ func (v nameInputView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (v nameInputView) View() string {
-	var s string
-	s += "Welcome to Scrum Poker!\n\n"
-	s += v.textInput.View() + "\n\n"
-	s += "Press Enter to continue\n"
+	var s strings.Builder
+	s.WriteString("Welcome to Scrum Poker!\n\n")
+	s.WriteString(v.textInput.View() + "\n\n")
+	s.WriteString("Press Enter to continue\n")
 	if v.err != nil {
-		s += "\nError: " + v.err.Error() + "\n"
+		s.WriteString("\nError: " + v.err.Error() + "\n")
 	}
-	return lipgloss.NewStyle().Padding(1).Render(s)
+	return lipgloss.NewStyle().Padding(1).Render(s.String())
 }

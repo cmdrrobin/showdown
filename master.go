@@ -105,6 +105,7 @@ func newMasterView() masterView {
 		help:     help.New(),
 	}
 
+	// default show full help information
 	m.help.ShowAll = true
 	return m
 }
@@ -250,6 +251,7 @@ func (m masterView) View() string {
 	state.mu.RLock()
 	defer state.mu.RUnlock()
 
+	// TODO: should be moved to var
 	labelStyle := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color(catppuccinMauve)).
@@ -278,17 +280,32 @@ func (m masterView) View() string {
 		}
 	}
 
-	s.WriteString(fmt.Sprintf("Connected Players: %d\n\n", len(state.players)))
-
 	if len(state.players) == 0 {
 		s.WriteString("Waiting for players to join...\n")
 	} else {
+		s.WriteString(fmt.Sprintf("Connected Players: %d\n\n", len(state.players)))
+
 		// Sort players by name for consistent display
 		names := make([]string, 0, len(state.players))
 		for name := range state.players {
 			names = append(names, name)
 		}
 		sort.Strings(names)
+
+		// Display players
+		s.WriteString("Players:\n")
+		for _, name := range names {
+			player := state.players[name]
+			if state.revealed {
+				s.WriteString(fmt.Sprintf("• %s: %s\n", name, player.points))
+			} else {
+				if player.selected {
+					s.WriteString(fmt.Sprintf("• %s: ✓\n", name))
+				} else {
+					s.WriteString(fmt.Sprintf("• %s: waiting...\n", name))
+				}
+			}
+		}
 
 		// Calculate voting progress
 		voted := 0
@@ -300,8 +317,6 @@ func (m masterView) View() string {
 			}
 		}
 
-		s.WriteString(fmt.Sprintf("Voting Progress: %d/%d\n\n", voted, len(state.players)))
-
 		// Display statistics when points are revealed
 		if state.revealed && voted > 0 {
 			avg, median, distribution := calculateStatistics(points)
@@ -311,7 +326,7 @@ func (m masterView) View() string {
 				progress.WithWidth(50),
 			)
 
-			s.WriteString("📊 Voting Statistics:\n")
+			s.WriteString("\n📊 Voting Statistics:\n")
 			if avg > 0 {
 				s.WriteString(fmt.Sprintf("Average: %.1f\n", avg))
 			}
@@ -340,21 +355,8 @@ func (m masterView) View() string {
 				s.WriteString(p.ViewAs(percentage))
 				s.WriteString("\n\n")
 			}
-		}
-
-		// Display players
-		s.WriteString("Players:\n")
-		for _, name := range names {
-			player := state.players[name]
-			if state.revealed {
-				s.WriteString(fmt.Sprintf("• %s: %s\n", name, player.points))
-			} else {
-				if player.selected {
-					s.WriteString(fmt.Sprintf("• %s: ✓\n", name))
-				} else {
-					s.WriteString(fmt.Sprintf("• %s: waiting...\n", name))
-				}
-			}
+		} else {
+			s.WriteString(fmt.Sprintf("\nVoting Progress: %d/%d\n\n", voted, len(state.players)))
 		}
 	}
 

@@ -108,8 +108,11 @@ func initPlayerView(playerName string, session ssh.Session) (tea.Model, tea.Cmd)
 
 func initialNameInputView(session ssh.Session) nameInputView {
 	ti := textinput.New()
+	ti.Cursor.Style = focusStyle
 	ti.Placeholder = "Enter your name"
 	ti.Focus()
+	ti.PromptStyle = focusStyle
+	ti.TextStyle = focusStyle
 	ti.CharLimit = 30
 	ti.Width = 30
 
@@ -156,7 +159,7 @@ func (v nameInputView) View() string {
 	var s strings.Builder
 	s.WriteString("Welcome to Scrum Poker!\n\n")
 	s.WriteString(v.textInput.View() + "\n\n")
-	s.WriteString("Press Enter to continue\n")
+	s.WriteString(helpStyle("Press Enter to continue\n"))
 	if v.err != nil {
 		s.WriteString("\nError: " + v.err.Error() + "\n")
 	}

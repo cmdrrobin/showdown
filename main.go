@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
 	bm "github.com/charmbracelet/wish/bubbletea"
@@ -33,6 +34,15 @@ const (
 	catppuccinCrust     = "#11111b"
 	catppuccinSubtext0  = "#a6adc8"
 	catppuccinOverlay1  = "#7f849c"
+)
+
+var (
+	// some style colouring
+	focusStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(catppuccinMauve))
+	timerStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(catppuccinSubtext0)).Render
+	helpStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color(catppuccinOverlay1)).Render
+	// set Story Points options for each team player
+	pointOptions = []string{"1", "2", "3", "5", "8", "13", "21", "?"}
 )
 
 type gameState struct {

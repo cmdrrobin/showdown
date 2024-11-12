@@ -13,19 +13,23 @@ import (
 	"github.com/charmbracelet/ssh"
 )
 
+var (
+	state = &gameState{
+		players: make(map[string]*playerState),
+	}
+	timerDurations = map[string]time.Duration{
+		"1": time.Minute,
+		"2": 2 * time.Minute,
+		"3": 3 * time.Minute,
+		"5": 5 * time.Minute,
+	}
+)
 
 type playerState struct {
 	points   string
 	session  ssh.Session
 	selected bool
 }
-
-var (
-	state = &gameState{
-		players: make(map[string]*playerState),
-	}
-	pointOptions = []string{"1", "2", "3", "5", "8", "13", "21", "?"}
-)
 
 type masterView struct {
 	revealed bool
@@ -38,18 +42,6 @@ type masterView struct {
 type (
 	timerStartMsg   struct{}
 	timerExpiredMsg struct{}
-)
-
-// Add timer durations
-var (
-	timerDurations = map[string]time.Duration{
-		"1": time.Minute,
-		"2": 2 * time.Minute,
-		"3": 3 * time.Minute,
-		"5": 5 * time.Minute,
-	}
-	timerStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(catppuccinSubtext0)).Render
-	helpStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color(catppuccinOverlay1)).Render
 )
 
 type tickMsg time.Time

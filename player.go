@@ -82,7 +82,8 @@ func initPlayerView(playerName string, session ssh.Session) (tea.Model, tea.Cmd)
 		items[i] = PointItem{value: p}
 	}
 
-	l := list.New(items, list.NewDefaultDelegate(), 20, 20)
+	d := list.NewDefaultDelegate()
+	l := list.New(items, d, 20, 20)
 	l.Title = "Select Points"
 	l.SetShowTitle(true)
 	l.SetFilteringEnabled(false)

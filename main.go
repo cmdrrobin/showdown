@@ -30,6 +30,8 @@ const (
 	catppuccinLavender  = "#b4befe"
 	catppuccinText      = "#cdd6f4"
 	catppuccinCrust     = "#11111b"
+	catppuccinSubtext0  = "#a6adc8"
+	catppuccinOverlay1  = "#7f849c"
 )
 
 func pokerHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {

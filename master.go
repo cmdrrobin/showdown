@@ -48,12 +48,16 @@ type (
 )
 
 // Add timer durations
-var timerDurations = map[string]time.Duration{
-	"1": time.Minute,
-	"2": 2 * time.Minute,
-	"3": 3 * time.Minute,
-	"5": 5 * time.Minute,
-}
+var (
+	timerDurations = map[string]time.Duration{
+		"1": time.Minute,
+		"2": 2 * time.Minute,
+		"3": 3 * time.Minute,
+		"5": 5 * time.Minute,
+	}
+	timerStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(catppuccinSubtext0)).Render
+	helpStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color(catppuccinOverlay1)).Render
+)
 
 type tickMsg time.Time
 
@@ -277,19 +281,9 @@ func (m masterView) View() string {
 		}
 	}
 
-	s.WriteString("\nCommands:\n")
-	s.WriteString("r: reveal points\n")
-	s.WriteString("c: clear points\n")
-	s.WriteString("d: disconnect all\n")
-	s.WriteString("q: quit\n")
-	s.WriteString("\nTimer Commands:\n")
-	s.WriteString("1: start 1 min timer\n")
-	s.WriteString("2: start 2 min timer\n")
-	s.WriteString("3: start 3 min timer\n")
-	s.WriteString("5: start 5 min timer\n")
-
-	// Add timestamp for refresh indication
-	s.WriteString(fmt.Sprintf("\nLast updated: %s", time.Now().Format("15:04:05")))
+	s.WriteString(timerStyle("\nTimer Commands: (1) min, (2) min, (3) min or (5) min\n"))
+	s.WriteString("\n")
+	s.WriteString(helpStyle("r = reveal, c = clear, d = disconnect all, q = quit"))
 
 	return lipgloss.NewStyle().Padding(1).Render(s.String())
 }

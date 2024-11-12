@@ -7,21 +7,70 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/help"
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/progress"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/ssh"
 )
 
+type keyMap struct {
+	Reveal     key.Binding
+	Clear      key.Binding
+	Disconnect key.Binding
+	Quit       key.Binding
+	One        key.Binding
+	Two        key.Binding
+	Three      key.Binding
+	Five       key.Binding
+}
+
 var (
 	state = &gameState{
 		players: make(map[string]*playerState),
 	}
+
 	timerDurations = map[string]time.Duration{
 		"1": time.Minute,
 		"2": 2 * time.Minute,
 		"3": 3 * time.Minute,
 		"5": 5 * time.Minute,
+	}
+
+	keysMaster = keyMap{
+		Reveal: key.NewBinding(
+			key.WithKeys("r"),
+			key.WithHelp("r", "reveal"),
+		),
+		Clear: key.NewBinding(
+			key.WithKeys("c"),
+			key.WithHelp("c", "clear score"),
+		),
+		Disconnect: key.NewBinding(
+			key.WithKeys("d"),
+			key.WithHelp("d", "disconnect players"),
+		),
+		Quit: key.NewBinding(
+			key.WithKeys("q", "esc", "ctrl+c"),
+			key.WithHelp("q", "quit"),
+		),
+		One: key.NewBinding(
+			key.WithKeys("1"),
+			key.WithHelp("1", "minute"),
+		),
+		Two: key.NewBinding(
+			key.WithKeys("2"),
+			key.WithHelp("2", "minutes"),
+		),
+		Three: key.NewBinding(
+			key.WithKeys("3"),
+			key.WithHelp("3", "minutes"),
+		),
+		Five: key.NewBinding(
+			key.WithKeys("5"),
+			key.WithHelp("5", "minutes"),
+		),
 	}
 )
 
@@ -36,6 +85,8 @@ type masterView struct {
 	timer    *time.Timer
 	endTime  time.Time
 	duration time.Duration
+	keys     keyMap
+	help     help.Model
 }
 
 // Add timer control messages
@@ -45,6 +96,33 @@ type (
 )
 
 type tickMsg time.Time
+
+func newMasterView() masterView {
+	// set some default values for masterView
+	m := masterView{
+		revealed: false,
+		keys:     keysMaster,
+		help:     help.New(),
+	}
+
+	m.help.ShowAll = true
+	return m
+}
+
+// ShortHelp returns keybindings to be shown in the mini help view. It's part
+// of the key.Map interface.
+func (k keyMap) ShortHelp() []key.Binding {
+	return []key.Binding{k.Reveal, k.Clear, k.Disconnect, k.Quit}
+}
+
+// FullHelp returns keybindings for the expanded help view. It's part of the
+// key.Map interface.
+func (k keyMap) FullHelp() [][]key.Binding {
+	return [][]key.Binding{
+		{k.One, k.Two, k.Three, k.Five},
+		{k.Reveal, k.Clear, k.Disconnect, k.Quit},
+	}
+}
 
 func tickEvery() tea.Cmd {
 	return tea.Every(time.Second, func(t time.Time) tea.Msg {
@@ -111,18 +189,23 @@ func quitPlayers() {
 
 func (m masterView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		// If we set a width on the help menu it can gracefully truncate
+		// its view as needed.
+		m.help.Width = msg.Width
+
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "q", "ctrl+c", "esc":
+		switch {
+		case key.Matches(msg, m.keys.Quit):
 			quitPlayers()
 			state.masterConn = nil
 			return m, tea.Quit
-		case "r":
+		case key.Matches(msg, m.keys.Reveal):
 			state.mu.Lock()
 			state.revealed = true
 			state.mu.Unlock()
 			return m, tickEvery()
-		case "c":
+		case key.Matches(msg, m.keys.Clear):
 			state.mu.Lock()
 			state.revealed = false
 			for _, player := range state.players {
@@ -132,13 +215,16 @@ func (m masterView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			state.mu.Unlock()
 			m.timer = nil
 			return m, tickEvery()
-		case "d":
+		case key.Matches(msg, m.keys.Disconnect):
 			state.mu.Lock()
 			quitPlayers()
 			state.mu.Unlock()
 			m.timer = nil
 			return m, tickEvery()
-		case "1", "2", "3", "5":
+		case key.Matches(msg, m.keys.One),
+			key.Matches(msg, m.keys.Two),
+			key.Matches(msg, m.keys.Three),
+			key.Matches(msg, m.keys.Five):
 			// Start timer with selected duration
 			duration := timerDurations[msg.String()]
 			m.duration = duration
@@ -272,9 +358,8 @@ func (m masterView) View() string {
 		}
 	}
 
-	s.WriteString(timerStyle("\nTimer Commands: (1) min, (2) min, (3) min or (5) min\n"))
-	s.WriteString("\n")
-	s.WriteString(helpStyle("r = reveal, c = clear, d = disconnect all, q = quit"))
+	// show help menu
+	s.WriteString(fmt.Sprintf("\n%s", m.help.View(m.keys)))
 
 	return lipgloss.NewStyle().Padding(1).Render(s.String())
 }

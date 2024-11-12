@@ -36,21 +36,21 @@ const (
 	catppuccinOverlay1  = "#7f849c"
 )
 
-var (
-	// some style colouring
-	focusStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(catppuccinMauve))
-	timerStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(catppuccinSubtext0)).Render
-	helpStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color(catppuccinOverlay1)).Render
-	// set Story Points options for each team player
-	pointOptions = []string{"1", "2", "3", "5", "8", "13", "21", "?"}
-)
-
 type gameState struct {
 	players    map[string]*playerState
 	revealed   bool
 	mu         sync.RWMutex
 	masterConn ssh.Session
 }
+
+var (
+	// some style colouring
+	focusStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(catppuccinMauve))
+	timerStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(catppuccinSubtext0)).Render
+	helpStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color(catppuccinOverlay1)).Render
+	// set Story Points options for each team player
+	pointOptions = []string{"0.5", "1", "2", "3", "5", "8", "10", "?"}
+)
 
 func pokerHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 	_, _, active := s.Pty()
@@ -61,9 +61,7 @@ func pokerHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 
 	if state.masterConn == nil {
 		state.masterConn = s
-		m := masterView{
-			revealed: false,
-		}
+		m := newMasterView()
 		return m, []tea.ProgramOption{tea.WithAltScreen()}
 	}
 

@@ -1,13 +1,20 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"flag"
 	"fmt"
-	"log"
+	"net"
+	"os"
+	"os/signal"
 	"sync"
+	"syscall"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/log"
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
 	bm "github.com/charmbracelet/wish/bubbletea"
@@ -71,23 +78,42 @@ func pokerHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 func main() {
 	port := flag.Int("p", 23234, "SSH server port")
 	flag.Parse()
+	portStr := fmt.Sprintf("%d", *port)
 
+	host, err := os.Hostname()
+	if err != nil {
+		log.Error("couldn't determine hostname: %v", err)
+	}
+
+	// create SSH server
 	s, err := wish.NewServer(
-		wish.WithAddress(fmt.Sprintf(":%d", *port)),
-		wish.WithHostKeyPath(".ssh/term_info_ed25519"),
+		wish.WithAddress(net.JoinHostPort(host, portStr)),
+		wish.WithHostKeyPath(".ssh/scrumpoker_ed25519"),
 		wish.WithMiddleware(
-			logging.Middleware(),
 			bm.Middleware(pokerHandler),
+			logging.Middleware(),
 		),
 	)
 	if err != nil {
-		log.Fatalln(err)
+		log.Error("Could not start server", "error", err)
 	}
 
-	fmt.Printf("Starting SSH server on :%d\n", *port)
-	fmt.Printf("Connect with: ssh -t localhost -p %d\n", *port)
-	err = s.ListenAndServe()
-	if err != nil {
-		log.Fatalln(err)
+	// Open SSH listerner and serve SSH. Make it possible to stop the service
+	done := make(chan os.Signal, 1)
+	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	log.Info("Starting Scrum Poker server", "host", host, "port", portStr)
+	go func() {
+		if err = s.ListenAndServe(); err != nil && !errors.Is(err, ssh.ErrServerClosed) {
+			log.Error("Could not start server", "error", err)
+			done <- nil
+		}
+	}()
+
+	<-done
+	log.Info("Stopping Scrum Poker server")
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer func() { cancel() }()
+	if err := s.Shutdown(ctx); err != nil && !errors.Is(err, ssh.ErrServerClosed) {
+		log.Error("Could not stop server", "error", err)
 	}
 }

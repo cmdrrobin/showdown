@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"sync"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/ssh"
@@ -33,6 +34,13 @@ const (
 	catppuccinSubtext0  = "#a6adc8"
 	catppuccinOverlay1  = "#7f849c"
 )
+
+type gameState struct {
+	players    map[string]*playerState
+	revealed   bool
+	mu         sync.RWMutex
+	masterConn ssh.Session
+}
 
 func pokerHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 	_, _, active := s.Pty()

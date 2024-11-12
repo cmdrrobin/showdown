@@ -5,7 +5,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/charmbracelet/bubbles/progress"
@@ -14,12 +13,6 @@ import (
 	"github.com/charmbracelet/ssh"
 )
 
-type gameState struct {
-	players    map[string]*playerState
-	revealed   bool
-	mu         sync.RWMutex
-	masterConn ssh.Session
-}
 
 type playerState struct {
 	points   string
@@ -117,11 +110,20 @@ func calculateStatistics(points []string) (float64, string, map[string]int) {
 	return average, median, distribution
 }
 
+func quitPlayers() {
+	for _, player := range state.players {
+		player.session.Close()
+	}
+	state.players = make(map[string]*playerState)
+}
+
 func (m masterView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "q", "ctrl+c":
+		case "q", "ctrl+c", "esc":
+			quitPlayers()
+			state.masterConn = nil
 			return m, tea.Quit
 		case "r":
 			state.mu.Lock()
@@ -140,10 +142,7 @@ func (m masterView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tickEvery()
 		case "d":
 			state.mu.Lock()
-			for _, player := range state.players {
-				player.session.Close()
-			}
-			state.players = make(map[string]*playerState)
+			quitPlayers()
 			state.mu.Unlock()
 			m.timer = nil
 			return m, tickEvery()

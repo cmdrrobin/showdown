@@ -50,6 +50,12 @@ type gameState struct {
 	masterConn ssh.Session
 }
 
+type playerState struct {
+	points   string
+	session  ssh.Session
+	selected bool
+}
+
 var (
 	// some style colouring
 	focusStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(catppuccinMauve))

@@ -12,7 +12,6 @@ import (
 	"github.com/charmbracelet/bubbles/progress"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/ssh"
 )
 
 type keyMap struct {
@@ -74,12 +73,6 @@ var (
 	}
 )
 
-type playerState struct {
-	points   string
-	session  ssh.Session
-	selected bool
-}
-
 type masterView struct {
 	revealed bool
 	timer    *time.Timer
@@ -97,8 +90,8 @@ type (
 
 type tickMsg time.Time
 
+// set some default values for masterView and by default show help information
 func newMasterView() masterView {
-	// set some default values for masterView
 	m := masterView{
 		revealed: false,
 		keys:     keysMaster,
@@ -125,6 +118,7 @@ func (k keyMap) FullHelp() [][]key.Binding {
 	}
 }
 
+// set timer ticks
 func tickEvery() tea.Cmd {
 	return tea.Every(time.Second, func(t time.Time) tea.Msg {
 		return tickMsg(t)

@@ -20,9 +20,8 @@ type keyMapMaster struct {
 	Disconnect key.Binding
 	Quit       key.Binding
 	One        key.Binding
-	Two        key.Binding
 	Three      key.Binding
-	Five       key.Binding
+	Six        key.Binding
 }
 
 var (
@@ -31,10 +30,9 @@ var (
 	}
 
 	timerDurations = map[string]time.Duration{
-		"1": time.Minute,
-		"2": 2 * time.Minute,
-		"3": 3 * time.Minute,
-		"5": 5 * time.Minute,
+		"1": 15 * time.Second,
+		"3": 30 * time.Second,
+		"6": 60 * time.Second,
 	}
 
 	keysMaster = keyMapMaster{
@@ -56,19 +54,15 @@ var (
 		),
 		One: key.NewBinding(
 			key.WithKeys("1"),
-			key.WithHelp("1", "minute"),
-		),
-		Two: key.NewBinding(
-			key.WithKeys("2"),
-			key.WithHelp("2", "minutes"),
+			key.WithHelp("1", "15 seconds"),
 		),
 		Three: key.NewBinding(
 			key.WithKeys("3"),
-			key.WithHelp("3", "minutes"),
+			key.WithHelp("3", "30 seconds"),
 		),
-		Five: key.NewBinding(
-			key.WithKeys("5"),
-			key.WithHelp("5", "minutes"),
+		Six: key.NewBinding(
+			key.WithKeys("6"),
+			key.WithHelp("6", "60 seconds"),
 		),
 	}
 
@@ -120,14 +114,14 @@ func newMasterView() masterView {
 // ShortHelp returns keybindings to be shown in the mini help view. It's part
 // of the key.Map interface.
 func (k keyMapMaster) ShortHelp() []key.Binding {
-	return []key.Binding{k.Reveal, k.Clear, k.Disconnect, k.Quit}
+	return []key.Binding{k.One, k.Three, k.Six, k.Reveal, k.Clear, k.Disconnect, k.Quit}
 }
 
 // FullHelp returns keybindings for the expanded help view. It's part of the
 // key.Map interface.
 func (k keyMapMaster) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
-		{k.One, k.Two, k.Three, k.Five},
+		{k.One, k.Three, k.Six},
 		{k.Reveal, k.Clear, k.Disconnect, k.Quit},
 	}
 }
@@ -233,9 +227,8 @@ func (m masterView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.timer = nil
 			return m, tickEvery()
 		case key.Matches(msg, m.keys.One),
-			key.Matches(msg, m.keys.Two),
 			key.Matches(msg, m.keys.Three),
-			key.Matches(msg, m.keys.Five):
+			key.Matches(msg, m.keys.Six):
 			// Start timer with selected duration
 			duration := timerDurations[msg.String()]
 			m.duration = duration

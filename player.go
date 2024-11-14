@@ -11,6 +11,9 @@ import (
 	"github.com/charmbracelet/ssh"
 )
 
+// set Story Points options for each team player
+var pointOptions = []string{"0.5", "1", "2", "3", "5", "8", "10", "?"}
+
 type PointItem struct {
 	value string
 }

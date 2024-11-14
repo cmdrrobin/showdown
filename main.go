@@ -64,8 +64,6 @@ var (
 	focusStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(catppuccinMauve))
 	timerStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(catppuccinSubtext0)).Render
 	helpStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color(catppuccinOverlay1)).Render
-	// set Story Points options for each team player
-	pointOptions = []string{"0.5", "1", "2", "3", "5", "8", "10", "?"}
 )
 
 // Default Scrum Poker handler

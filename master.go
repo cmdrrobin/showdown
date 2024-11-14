@@ -71,6 +71,20 @@ var (
 			key.WithHelp("5", "minutes"),
 		),
 	}
+
+	// TODO: should be moved to var
+	labelStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color(catppuccinMauve)).
+			PaddingRight(2)
+
+	countStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color(catppuccinPeach)).
+			PaddingRight(1)
+
+	percentStyle = lipgloss.NewStyle().
+			Italic(true).
+			Foreground(lipgloss.Color(catppuccinSky))
 )
 
 type masterView struct {
@@ -247,19 +261,8 @@ func (m masterView) View() string {
 	state.mu.RLock()
 	defer state.mu.RUnlock()
 
-	// TODO: should be moved to var
-	labelStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color(catppuccinMauve)).
-		PaddingRight(2)
 
-	countStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color(catppuccinPeach)).
-		PaddingRight(1)
 
-	percentStyle := lipgloss.NewStyle().
-		Italic(true).
-		Foreground(lipgloss.Color(catppuccinSky))
 
 	var s strings.Builder
 	s.WriteString("🎲 Scrum Poker Master View\n\n")

@@ -257,12 +257,53 @@ func (m masterView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// A view for showing vote statistics
+func showFinalVotes(points []string, voted int) string {
+	var s strings.Builder
+
+	avg, median, distribution := calculateStatistics(points)
+
+	p := progress.New(
+		progress.WithScaledGradient(catppuccinMaroon, catppuccinLavender),
+		progress.WithWidth(50),
+	)
+
+	s.WriteString("\n📊 Voting Statistics:\n")
+	if avg > 0 {
+		s.WriteString(fmt.Sprintf("Average: %.1f\n", avg))
+	}
+	s.WriteString(fmt.Sprintf("Median: %s\n", median))
+
+	s.WriteString("Distribution:\n")
+	// Sort point values for consistent display
+	pointValues := make([]string, 0, len(distribution))
+	for p := range distribution {
+		pointValues = append(pointValues, p)
+	}
+	sort.Strings(pointValues)
+
+	for _, pointVal := range pointValues {
+		count := distribution[pointVal]
+		percentage := float64(count) / float64(voted)
+
+		label := labelStyle.Render(pointVal + ":")
+		votes := countStyle.Render(fmt.Sprintf("%d votes", count))
+		percent := percentStyle.Render(fmt.Sprintf("(%.1f%%)", percentage*100))
+
+		// Add the point value and vote count
+		s.WriteString(fmt.Sprintf("%s %s %s\n", label, votes, percent))
+
+		// Add the progress bar
+		s.WriteString(p.ViewAs(percentage))
+		s.WriteString("\n\n")
+	}
+
+	return s.String()
+}
+
 func (m masterView) View() string {
 	state.mu.RLock()
 	defer state.mu.RUnlock()
-
-
-
 
 	var s strings.Builder
 	s.WriteString("🎲 Scrum Poker Master View\n\n")
@@ -318,42 +359,7 @@ func (m masterView) View() string {
 
 		// Display statistics when revealed key is pressed and votes are available
 		if state.revealed && voted > 0 {
-			avg, median, distribution := calculateStatistics(points)
-
-			p := progress.New(
-				progress.WithScaledGradient(catppuccinMaroon, catppuccinLavender),
-				progress.WithWidth(50),
-			)
-
-			s.WriteString("\n📊 Voting Statistics:\n")
-			if avg > 0 {
-				s.WriteString(fmt.Sprintf("Average: %.1f\n", avg))
-			}
-			s.WriteString(fmt.Sprintf("Median: %s\n", median))
-
-			s.WriteString("Distribution:\n")
-			// Sort point values for consistent display
-			pointValues := make([]string, 0, len(distribution))
-			for p := range distribution {
-				pointValues = append(pointValues, p)
-			}
-			sort.Strings(pointValues)
-
-			for _, pointVal := range pointValues {
-				count := distribution[pointVal]
-				percentage := float64(count) / float64(voted)
-
-				label := labelStyle.Render(pointVal + ":")
-				votes := countStyle.Render(fmt.Sprintf("%d votes", count))
-				percent := percentStyle.Render(fmt.Sprintf("(%.1f%%)", percentage*100))
-
-				// Add the point value and vote count
-				s.WriteString(fmt.Sprintf("%s %s %s\n", label, votes, percent))
-
-				// Add the progress bar
-				s.WriteString(p.ViewAs(percentage))
-				s.WriteString("\n\n")
-			}
+			s.WriteString(showFinalVotes(points, voted))
 		} else {
 			s.WriteString(fmt.Sprintf("\nVoting Progress: %d/%d\n\n", voted, len(state.players)))
 		}

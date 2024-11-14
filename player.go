@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -35,11 +36,53 @@ type nameInputView struct {
 	session   ssh.Session
 }
 
+type delegateKeyMap struct {
+	choose key.Binding
+}
+
+func newDelegateKeyMap() *delegateKeyMap {
+	return &delegateKeyMap{
+		choose: key.NewBinding(
+			key.WithKeys("enter"),
+			key.WithHelp("enter", "choose"),
+		),
+	}
+}
+
+// Additional short help entries. This satisfies the help.KeyMap interface and
+// is entirely optional.
+func (d delegateKeyMap) ShortHelp() []key.Binding {
+	return []key.Binding{
+		d.choose,
+	}
+}
+
+// Additional full help entries. This satisfies the help.KeyMap interface and
+// is entirely optional.
+func (d delegateKeyMap) FullHelp() [][]key.Binding {
+	return [][]key.Binding{
+		{
+			d.choose,
+		},
+	}
+}
+
 func (p playerView) Init() tea.Cmd {
 	return nil
 }
 
 func (p playerView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var (
+		selectedValue string
+		cmd           tea.Cmd
+	)
+
+	p.list, cmd = p.list.Update(msg)
+
+	if item, ok := p.list.SelectedItem().(PointItem); ok {
+		selectedValue = item.value
+	}
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -48,20 +91,15 @@ func (p playerView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			delete(state.players, p.name)
 			state.mu.Unlock()
 			return p, tea.Quit
+		case "enter":
+			state.mu.Lock()
+			if player, exists := state.players[p.name]; exists {
+				player.points = selectedValue
+				player.selected = true
+			}
+			state.mu.Unlock()
+			p.selected = selectedValue
 		}
-	}
-
-	var cmd tea.Cmd
-	p.list, cmd = p.list.Update(msg)
-
-	if item, ok := p.list.SelectedItem().(PointItem); ok {
-		state.mu.Lock()
-		if player, exists := state.players[p.name]; exists {
-			player.points = item.value
-			player.selected = true
-		}
-		state.mu.Unlock()
-		p.selected = item.value
 	}
 
 	return p, cmd
@@ -80,6 +118,24 @@ func (p playerView) View() string {
 	return lipgloss.NewStyle().Padding(1).Render(s.String())
 }
 
+// A function to add additional help to key bindings
+// TODO: need to find out if this is _really_ required and not a better simpler way
+func additionalDelegateKeys(keys *delegateKeyMap) list.DefaultDelegate {
+	d := list.NewDefaultDelegate()
+
+	help := []key.Binding{keys.choose}
+
+	d.ShortHelpFunc = func() []key.Binding {
+		return help
+	}
+
+	d.FullHelpFunc = func() [][]key.Binding {
+		return [][]key.Binding{help}
+	}
+
+	return d
+}
+
 func initPlayerView(playerName string, session ssh.Session) (tea.Model, tea.Cmd) {
 	items := make([]list.Item, len(pointOptions))
 	for i, p := range pointOptions {
@@ -87,7 +143,7 @@ func initPlayerView(playerName string, session ssh.Session) (tea.Model, tea.Cmd)
 	}
 
 	selectedColor := lipgloss.Color(catppuccinMauve)
-	d := list.NewDefaultDelegate()
+	d := additionalDelegateKeys(newDelegateKeyMap())
 	d.Styles.SelectedTitle = d.Styles.SelectedTitle.Foreground(selectedColor).BorderLeftForeground(selectedColor)
 	d.Styles.SelectedDesc = d.Styles.SelectedTitle
 	l := list.New(items, d, 20, 20)

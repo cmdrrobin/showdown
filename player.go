@@ -42,7 +42,8 @@ func (p playerView) Init() tea.Cmd {
 func (p playerView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		if msg.String() == "q" {
+		switch msg.String() {
+		case "q", "esc", "ctrl+c":
 			state.mu.Lock()
 			delete(state.players, p.name)
 			state.mu.Unlock()

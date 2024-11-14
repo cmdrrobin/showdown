@@ -14,7 +14,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-type keyMap struct {
+type keyMapMaster struct {
 	Reveal     key.Binding
 	Clear      key.Binding
 	Disconnect key.Binding
@@ -37,7 +37,7 @@ var (
 		"5": 5 * time.Minute,
 	}
 
-	keysMaster = keyMap{
+	keysMaster = keyMapMaster{
 		Reveal: key.NewBinding(
 			key.WithKeys("r"),
 			key.WithHelp("r", "reveal"),
@@ -92,7 +92,7 @@ type masterView struct {
 	timer    *time.Timer
 	endTime  time.Time
 	duration time.Duration
-	keys     keyMap
+	keys     keyMapMaster
 	help     help.Model
 }
 
@@ -119,13 +119,13 @@ func newMasterView() masterView {
 
 // ShortHelp returns keybindings to be shown in the mini help view. It's part
 // of the key.Map interface.
-func (k keyMap) ShortHelp() []key.Binding {
+func (k keyMapMaster) ShortHelp() []key.Binding {
 	return []key.Binding{k.Reveal, k.Clear, k.Disconnect, k.Quit}
 }
 
 // FullHelp returns keybindings for the expanded help view. It's part of the
 // key.Map interface.
-func (k keyMap) FullHelp() [][]key.Binding {
+func (k keyMapMaster) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.One, k.Two, k.Three, k.Five},
 		{k.Reveal, k.Clear, k.Disconnect, k.Quit},

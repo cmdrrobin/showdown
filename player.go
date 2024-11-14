@@ -86,18 +86,23 @@ func initPlayerView(playerName string, session ssh.Session) (tea.Model, tea.Cmd)
 		items[i] = PointItem{value: p}
 	}
 
+	selectedColor := lipgloss.Color(catppuccinMauve)
 	d := list.NewDefaultDelegate()
+	d.Styles.SelectedTitle = d.Styles.SelectedTitle.Foreground(selectedColor).BorderLeftForeground(selectedColor)
+	d.Styles.SelectedDesc = d.Styles.SelectedTitle
 	l := list.New(items, d, 20, 20)
 	l.Title = "Select Points"
 	l.SetShowTitle(true)
-	l.SetFilteringEnabled(false)
 	l.SetFilteringEnabled(false) // no filtering needed
 	// styling of the list title
 	l.Styles.Title = lipgloss.NewStyle().
 		Background(lipgloss.Color(catppuccinSky)).
 		Foreground(lipgloss.Color(catppuccinCrust)).
+		Bold(true).
 		Padding(0, 1)
 	// * styling of the number of items in a list (* item(s))
+	l.Styles.StatusBar = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(catppuccinBlue))
 
 	p := playerView{
 		name: playerName,

@@ -136,6 +136,7 @@ func startTimer(duration time.Duration) tea.Cmd {
 	}
 }
 
+// Calculation of given points by team players
 func calculateStatistics(points []string) (float64, string, map[string]int) {
 	var numericPoints []float64
 	distribution := make(map[string]int)
@@ -175,6 +176,7 @@ func calculateStatistics(points []string) (float64, string, map[string]int) {
 	return average, median, distribution
 }
 
+// Quit all team player sessions
 func quitPlayers() {
 	for _, player := range state.players {
 		player.session.Close()
@@ -311,7 +313,7 @@ func (m masterView) View() string {
 			}
 		}
 
-		// Display statistics when points are revealed
+		// Display statistics when revealed key is pressed and votes are available
 		if state.revealed && voted > 0 {
 			avg, median, distribution := calculateStatistics(points)
 

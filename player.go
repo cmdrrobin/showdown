@@ -87,10 +87,13 @@ func initPlayerView(playerName string, session ssh.Session) (tea.Model, tea.Cmd)
 	l.Title = "Select Points"
 	l.SetShowTitle(true)
 	l.SetFilteringEnabled(false)
+	l.SetFilteringEnabled(false) // no filtering needed
+	// styling of the list title
 	l.Styles.Title = lipgloss.NewStyle().
 		Background(lipgloss.Color(catppuccinSky)).
 		Foreground(lipgloss.Color(catppuccinCrust)).
 		Padding(0, 1)
+	// * styling of the number of items in a list (* item(s))
 
 	p := playerView{
 		name: playerName,

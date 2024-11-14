@@ -43,6 +43,7 @@ const (
 	catppuccinOverlay1  = "#7f849c"
 )
 
+// Information about game state for Scrum Master view
 type gameState struct {
 	players    map[string]*playerState
 	revealed   bool
@@ -50,12 +51,14 @@ type gameState struct {
 	masterConn ssh.Session
 }
 
+// Information about a player
 type playerState struct {
 	points   string
 	session  ssh.Session
 	selected bool
 }
 
+// some variables for both master and player
 var (
 	// some style colouring
 	focusStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(catppuccinMauve))
@@ -65,6 +68,7 @@ var (
 	pointOptions = []string{"0.5", "1", "2", "3", "5", "8", "10", "?"}
 )
 
+// Default Scrum Poker handler
 func pokerHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 	_, _, active := s.Pty()
 	if !active {
@@ -72,12 +76,16 @@ func pokerHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 		return nil, nil
 	}
 
+	// Set Scrum Master connection view when there is none.
+	// The initial (first) connection is always for the Scrum Master
 	if state.masterConn == nil {
 		state.masterConn = s
 		m := newMasterView()
 		return m, []tea.ProgramOption{tea.WithAltScreen()}
 	}
 
+	// Setup Player connection view
+	// TODO: better naming functions
 	return initialNameInputView(s), []tea.ProgramOption{tea.WithAltScreen()}
 }
 

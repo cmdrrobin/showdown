@@ -192,6 +192,17 @@ func quitPlayers() {
 	state.players = make(map[string]*playerState)
 }
 
+// To clear revealing and points of players
+func clearPlayerState() {
+	state.mu.Lock()
+	state.revealed = false
+	for _, player := range state.players {
+		player.points = ""
+		player.selected = false
+	}
+	state.mu.Unlock()
+}
+
 func (m masterView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -204,35 +215,35 @@ func (m masterView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, m.keys.Quit):
 			quitPlayers()
 			state.masterConn = nil
+
 			return m, tea.Quit
 		case key.Matches(msg, m.keys.Reveal):
 			state.mu.Lock()
 			state.revealed = true
 			state.mu.Unlock()
+
 			return m, tickEvery()
 		case key.Matches(msg, m.keys.Clear):
-			state.mu.Lock()
-			state.revealed = false
-			for _, player := range state.players {
-				player.points = ""
-				player.selected = false
-			}
-			state.mu.Unlock()
+			clearPlayerState()
 			m.timer = nil
+
 			return m, tickEvery()
 		case key.Matches(msg, m.keys.Disconnect):
 			state.mu.Lock()
 			quitPlayers()
 			state.mu.Unlock()
 			m.timer = nil
+
 			return m, tickEvery()
 		case key.Matches(msg, m.keys.One),
 			key.Matches(msg, m.keys.Three),
 			key.Matches(msg, m.keys.Six):
+			clearPlayerState()
 			// Start timer with selected duration
 			duration := timerDurations[msg.String()]
 			m.duration = duration
 			m.endTime = time.Now().Add(duration)
+
 			return m, tea.Batch(
 				tickEvery(),
 				startTimer(duration),

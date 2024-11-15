@@ -2,6 +2,10 @@
 
 Showdown is Scrum Poker game written in Go. The name Showdown reference to the last reveal in a poker game.
 
+![Showdown view of Scrum Master](./images/showdown-master.gif)
+
+![Showdown view of team player](./images/showdown-player.gif)
+
 ## Why
 
 I have created this to learn more about Go and I wanted to work on a project that can be used in a terminal. The Go

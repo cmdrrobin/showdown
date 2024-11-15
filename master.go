@@ -310,7 +310,7 @@ func (m masterView) View() string {
 	defer state.mu.RUnlock()
 
 	var s strings.Builder
-	s.WriteString("🎲 Scrum Poker Master View\n\n")
+	s.WriteString("🎲 Showdown - Scrum Master\n\n")
 
 	// Show timer if active
 	if !m.endTime.IsZero() {

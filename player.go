@@ -107,7 +107,7 @@ func (p playerView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (p playerView) View() string {
 	var s strings.Builder
-	s.WriteString(fmt.Sprintf("🎲 Scrum Poker - Player: %s\n\n", p.name))
+	s.WriteString(fmt.Sprintf("🎲 Showdown - Player: %s\n\n", p.name))
 	s.WriteString(p.list.View() + "\n\n")
 
 	if p.selected != "" {
@@ -225,7 +225,7 @@ func (v nameInputView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (v nameInputView) View() string {
 	var s strings.Builder
-	s.WriteString("Welcome to Scrum Poker!\n\n")
+	s.WriteString("Welcome to Showdown!\n\n")
 	s.WriteString(v.textInput.View() + "\n\n")
 	s.WriteString(helpStyle("Press Enter to continue\n"))
 	if v.err != nil {

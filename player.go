@@ -77,7 +77,14 @@ func (p playerView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmd           tea.Cmd
 	)
 
-	p.list, cmd = p.list.Update(msg)
+	// Only update list if scores aren't revealed
+	state.mu.RLock()
+	revealed := state.revealed
+	state.mu.RUnlock()
+
+	if !revealed {
+		p.list, cmd = p.list.Update(msg)
+	}
 
 	if item, ok := p.list.SelectedItem().(PointItem); ok {
 		selectedValue = item.value
@@ -92,13 +99,16 @@ func (p playerView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			state.mu.Unlock()
 			return p, tea.Quit
 		case "enter":
-			state.mu.Lock()
-			if player, exists := state.players[p.name]; exists {
-				player.points = selectedValue
-				player.selected = true
+			// Only allow selection if scores aren't revealed
+			if !revealed {
+				state.mu.Lock()
+				if player, exists := state.players[p.name]; exists {
+					player.points = selectedValue
+					player.selected = true
+				}
+				state.mu.Unlock()
+				p.selected = selectedValue
 			}
-			state.mu.Unlock()
-			p.selected = selectedValue
 		}
 	}
 

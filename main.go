@@ -66,6 +66,29 @@ var (
 	helpStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color(catppuccinOverlay1)).Render
 )
 
+// Validate SSH public key with defined authorized keys
+func checkAuthorizedKey(s ssh.Session) bool {
+	pubKey := s.PublicKey()
+	if pubKey == nil {
+		log.Error("No public key found!")
+		return false
+	}
+
+	authorizedKeys, err := os.ReadFile(".ssh/showdown_keys")
+	if err != nil {
+		log.Error("failed to read authorized_keys", "error", err)
+		return false
+	}
+
+	parsedKeys, _, _, _, err := ssh.ParseAuthorizedKey(authorizedKeys)
+	if err != nil {
+		log.Error("failed to parse authorized_keys", "error", err)
+		return false
+	}
+
+	return ssh.KeysEqual(parsedKeys, pubKey)
+}
+
 // Default Scrum Poker handler
 func pokerHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 	_, _, active := s.Pty()
@@ -74,12 +97,14 @@ func pokerHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 		return nil, nil
 	}
 
-	// Set Scrum Master connection view when there is none.
-	// The initial (first) connection is always for the Scrum Master
-	if state.masterConn == nil {
-		state.masterConn = s
-		m := newMasterView()
-		return m, []tea.ProgramOption{tea.WithAltScreen()}
+	// Check if the connection has valid authorized key
+	if checkAuthorizedKey(s) {
+		// Set Scrum Master connection view when there is none.
+		if state.masterConn == nil {
+			state.masterConn = s
+			m := newMasterView()
+			return m, []tea.ProgramOption{tea.WithAltScreen()}
+		}
 	}
 
 	// Setup Player connection view
@@ -89,7 +114,9 @@ func pokerHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 
 func main() {
 	port := flag.Int("p", 23234, "SSH server port")
+	// Parse all declared flags
 	flag.Parse()
+
 	portStr := fmt.Sprintf("%d", *port)
 
 	host, err := os.Hostname()
@@ -100,7 +127,10 @@ func main() {
 	// create SSH server
 	s, err := wish.NewServer(
 		wish.WithAddress(net.JoinHostPort(host, portStr)),
-		wish.WithHostKeyPath(".ssh/scrumpoker_ed25519"),
+		wish.WithHostKeyPath(".ssh/showdown_ed25519"),
+		wish.WithPublicKeyAuth(func(ctx ssh.Context, key ssh.PublicKey) bool {
+			return key.Type() == "ssh-ed25519"
+		}),
 		wish.WithMiddleware(
 			bm.Middleware(pokerHandler),
 			logging.Middleware(),

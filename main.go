@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"flag"
-	"fmt"
 	"net"
 	"os"
 	"os/signal"
+	"strconv"
 	"sync"
 	"syscall"
 	"time"
@@ -17,7 +17,7 @@ import (
 	"github.com/charmbracelet/log"
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
-	bm "github.com/charmbracelet/wish/bubbletea"
+	"github.com/charmbracelet/wish/bubbletea"
 	"github.com/charmbracelet/wish/logging"
 )
 
@@ -70,7 +70,7 @@ var (
 func checkAuthorizedKey(s ssh.Session) bool {
 	pubKey := s.PublicKey()
 	if pubKey == nil {
-		log.Error("No public key found!")
+		log.Warn("No public key found!")
 		return false
 	}
 
@@ -102,8 +102,7 @@ func pokerHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 		// Set Scrum Master connection view when there is none.
 		if state.masterConn == nil {
 			state.masterConn = s
-			m := newMasterView()
-			return m, []tea.ProgramOption{tea.WithAltScreen()}
+			return newMasterView(), []tea.ProgramOption{tea.WithAltScreen()}
 		}
 	}
 
@@ -113,16 +112,18 @@ func pokerHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 }
 
 func main() {
+	// define flag for custom port
 	port := flag.Int("p", 23234, "SSH server port")
 	// Parse all declared flags
 	flag.Parse()
-
-	portStr := fmt.Sprintf("%d", *port)
 
 	host, err := os.Hostname()
 	if err != nil {
 		log.Error("couldn't determine hostname: %v", err)
 	}
+
+	// Convert port into string
+	portStr := strconv.Itoa(*port)
 
 	// create SSH server
 	s, err := wish.NewServer(
@@ -132,7 +133,7 @@ func main() {
 			return key.Type() == "ssh-ed25519"
 		}),
 		wish.WithMiddleware(
-			bm.Middleware(pokerHandler),
+			bubbletea.Middleware(pokerHandler),
 			logging.Middleware(),
 		),
 	)
@@ -143,7 +144,7 @@ func main() {
 	// Open SSH listerner and serve SSH. Make it possible to stop the service
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-	log.Info("Starting Scrum Poker server", "host", host, "port", portStr)
+	log.Info("Starting Showdown server", "host", host, "port", *port)
 	go func() {
 		if err = s.ListenAndServe(); err != nil && !errors.Is(err, ssh.ErrServerClosed) {
 			log.Error("Could not start server", "error", err)
@@ -152,7 +153,7 @@ func main() {
 	}()
 
 	<-done
-	log.Info("Stopping Scrum Poker server")
+	log.Info("Stopping Showdown server")
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer func() { cancel() }()
 	if err := s.Shutdown(ctx); err != nil && !errors.Is(err, ssh.ErrServerClosed) {

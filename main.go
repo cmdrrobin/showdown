@@ -19,6 +19,7 @@ import (
 	"github.com/charmbracelet/wish"
 	"github.com/charmbracelet/wish/bubbletea"
 	"github.com/charmbracelet/wish/logging"
+	gossh "golang.org/x/crypto/ssh"
 )
 
 // Catppuccin Mocha colors
@@ -130,7 +131,14 @@ func main() {
 		wish.WithAddress(net.JoinHostPort(host, portStr)),
 		wish.WithHostKeyPath(".ssh/showdown_ed25519"),
 		wish.WithPublicKeyAuth(func(ctx ssh.Context, key ssh.PublicKey) bool {
-			return key.Type() == "ssh-ed25519"
+			// Allow connections with any ed25519 key
+			return key != nil && key.Type() == "ssh-ed25519"
+		}),
+		// Add keyboard-interactive auth that immediately succeeds without prompting
+		// HACK(robin): need to allow normal players to join. For those who don't have a public key set
+		wish.WithKeyboardInteractiveAuth(func(ctx ssh.Context, challenger gossh.KeyboardInteractiveChallenge) bool {
+			// Authenticate immediately without any challenge
+			return true
 		}),
 		wish.WithMiddleware(
 			bubbletea.Middleware(pokerHandler),

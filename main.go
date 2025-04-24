@@ -112,6 +112,24 @@ func pokerHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 	return initialNameInputView(s), []tea.ProgramOption{tea.WithAltScreen()}
 }
 
+// Middleware to handle session closure and reset masterConn if needed
+func sessionCloseMiddleware() wish.Middleware {
+	return func(h ssh.Handler) ssh.Handler {
+		return func(s ssh.Session) {
+			// Run the handler (this blocks until session ends)
+			h(s)
+
+			// After session ends, check if it was the master connection
+			state.mu.Lock()
+			defer state.mu.Unlock()
+			if state.masterConn == s {
+				state.masterConn = nil
+				log.Info("Scrum Master disconnected, reset connection")
+			}
+		}
+	}
+}
+
 func main() {
 	// define flag for custom port
 	port := flag.Int("p", 23234, "SSH server port")
@@ -143,6 +161,7 @@ func main() {
 		wish.WithMiddleware(
 			bubbletea.Middleware(pokerHandler),
 			logging.Middleware(),
+			sessionCloseMiddleware(),
 		),
 	)
 	if err != nil {

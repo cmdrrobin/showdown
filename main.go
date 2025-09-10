@@ -4,14 +4,18 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
 	"net"
 	"os"
 	"os/signal"
+	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
 
+	"github.com/charmbracelet/bubbles/progress"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/log"
@@ -43,6 +47,114 @@ const (
 	catppuccinSubtext0  = "#a6adc8"
 	catppuccinOverlay1  = "#7f849c"
 )
+
+// Shared styles for statistics display
+var (
+	labelStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color(catppuccinMauve)).
+			PaddingRight(2)
+
+	countStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color(catppuccinPeach)).
+			PaddingRight(1)
+
+	percentStyle = lipgloss.NewStyle().
+			Italic(true).
+			Foreground(lipgloss.Color(catppuccinSky))
+)
+
+// Shared types and functions for tick updates
+type tickMsg time.Time
+
+func tickEvery() tea.Cmd {
+	return tea.Every(time.Second, func(t time.Time) tea.Msg {
+		return tickMsg(t)
+	})
+}
+
+// Shared functions for statistics calculation and display
+func calculateStatistics(points []string) (float64, string, map[string]int) {
+	var numericPoints []float64
+	distribution := make(map[string]int)
+
+	// Calculate distribution and collect numeric points
+	for _, p := range points {
+		distribution[p]++
+		if num, err := strconv.ParseFloat(p, 64); err == nil {
+			numericPoints = append(numericPoints, num)
+		}
+	}
+
+	// Calculate average
+	var average float64
+	if len(numericPoints) > 0 {
+		sum := 0.0
+		for _, num := range numericPoints {
+			sum += num
+		}
+		average = sum / float64(len(numericPoints))
+	}
+
+	// Calculate median
+	var median string
+	if len(numericPoints) > 0 {
+		sort.Float64s(numericPoints)
+		mid := len(numericPoints) / 2
+		if len(numericPoints)%2 == 0 {
+			median = fmt.Sprintf("%.1f", (numericPoints[mid-1]+numericPoints[mid])/2)
+		} else {
+			median = fmt.Sprintf("%.1f", numericPoints[mid])
+		}
+	} else {
+		median = "N/A"
+	}
+
+	return average, median, distribution
+}
+
+func showFinalVotes(points []string, voted int) string {
+	var s strings.Builder
+
+	avg, median, distribution := calculateStatistics(points)
+
+	p := progress.New(
+		progress.WithScaledGradient(catppuccinMaroon, catppuccinLavender),
+		progress.WithWidth(50),
+	)
+
+	s.WriteString("\n📊 Voting Statistics:\n")
+	if avg > 0 {
+		s.WriteString(fmt.Sprintf("Average: %.1f\n", avg))
+	}
+	s.WriteString(fmt.Sprintf("Median: %s\n", median))
+
+	s.WriteString("Distribution:\n")
+	// Sort point values for consistent display
+	pointValues := make([]string, 0, len(distribution))
+	for p := range distribution {
+		pointValues = append(pointValues, p)
+	}
+	sort.Strings(pointValues)
+
+	for _, pointVal := range pointValues {
+		count := distribution[pointVal]
+		percentage := float64(count) / float64(voted)
+
+		label := labelStyle.Render(pointVal + ":")
+		votes := countStyle.Render(fmt.Sprintf("%d votes", count))
+		percent := percentStyle.Render(fmt.Sprintf("(%.1f%%)", percentage*100))
+
+		// Add the point value and vote count
+		s.WriteString(fmt.Sprintf("%s %s %s\n", label, votes, percent))
+
+		// Add the progress bar
+		s.WriteString(p.ViewAs(percentage))
+		s.WriteString("\n\n")
+	}
+
+	return s.String()
+}
 
 // Information about game state for Scrum Master view
 type gameState struct {

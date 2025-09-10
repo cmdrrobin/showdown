@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -68,7 +69,7 @@ func (d delegateKeyMap) FullHelp() [][]key.Binding {
 }
 
 func (p playerView) Init() tea.Cmd {
-	return nil
+	return tickEvery()
 }
 
 func (p playerView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -110,18 +111,65 @@ func (p playerView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				p.selected = selectedValue
 			}
 		}
+	case tickMsg:
+		return p, tickEvery()
 	}
 
 	return p, cmd
 }
 
+func (p playerView) showResults() string {
+	state.mu.RLock()
+	defer state.mu.RUnlock()
+
+	var s strings.Builder
+	s.WriteString("📊 Voting Results:\n\n")
+
+	// Show all players and their votes
+	names := make([]string, 0, len(state.players))
+	for name := range state.players {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	s.WriteString("Player Votes:\n")
+	var points []string
+	voted := 0
+
+	for _, name := range names {
+		player := state.players[name]
+		if player.selected {
+			s.WriteString(fmt.Sprintf("• %s: %s\n", name, player.points))
+			points = append(points, player.points)
+			voted++
+		} else {
+			s.WriteString(fmt.Sprintf("• %s: no vote\n", name))
+		}
+	}
+
+	// Show statistics if there are votes
+	if voted > 0 {
+		s.WriteString(showFinalVotes(points, voted))
+	}
+
+	return s.String()
+}
+
 func (p playerView) View() string {
 	var s strings.Builder
 	s.WriteString(fmt.Sprintf("🎲 Showdown - Player: %s\n\n", p.name))
-	s.WriteString(p.list.View() + "\n\n")
 
-	if p.selected != "" {
-		s.WriteString(fmt.Sprintf("Selected: %s\n", p.selected))
+	state.mu.RLock()
+	revealed := state.revealed
+	state.mu.RUnlock()
+
+	if revealed {
+		s.WriteString(p.showResults())
+	} else {
+		s.WriteString(p.list.View() + "\n\n")
+		if p.selected != "" {
+			s.WriteString(fmt.Sprintf("Selected: %s\n", p.selected))
+		}
 	}
 
 	s.WriteString("\nPress q to quit")
@@ -201,7 +249,7 @@ func initialNameInputView(session ssh.Session) nameInputView {
 }
 
 func (v nameInputView) Init() tea.Cmd {
-	return textinput.Blink
+	return tea.Batch(textinput.Blink, tickEvery())
 }
 
 func (v nameInputView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -227,6 +275,8 @@ func (v nameInputView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyCtrlC:
 			return v, tea.Quit
 		}
+	case tickMsg:
+		return v, tickEvery()
 	}
 
 	v.textInput, cmd = v.textInput.Update(msg)

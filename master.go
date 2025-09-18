@@ -129,6 +129,8 @@ func startTimer(duration time.Duration) tea.Cmd {
 // Quit all team player sessions
 func quitPlayers() {
 	for _, player := range state.players {
+		// Reset terminal before closing session
+		resetTerminal(player.session)
 		player.session.Close()
 	}
 	state.players = make(map[string]*playerState)

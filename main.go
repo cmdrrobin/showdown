@@ -26,6 +26,18 @@ import (
 	gossh "golang.org/x/crypto/ssh"
 )
 
+// resetTerminal sends ANSI escape sequences to reset terminal state
+func resetTerminal(s ssh.Session) {
+	// Exit alternate screen buffer
+	s.Write([]byte("\033[?1049l"))
+	// Show cursor
+	s.Write([]byte("\033[?25h"))
+	// Reset terminal to initial state
+	s.Write([]byte("\033c"))
+	// Clear screen and move cursor to home
+	s.Write([]byte("\033[2J\033[H"))
+}
+
 // Catppuccin Mocha colors
 const (
 	catppuccinRosewater = "#f5e0dc"
@@ -231,6 +243,9 @@ func sessionCloseMiddleware() wish.Middleware {
 			// Run the handler (this blocks until session ends)
 			h(s)
 
+			// Reset terminal state before session closes
+			resetTerminal(s)
+
 			// After session ends, check if it was the master connection
 			state.mu.Lock()
 			defer state.mu.Unlock()
@@ -293,6 +308,19 @@ func main() {
 
 	<-done
 	log.Info("Stopping Showdown server")
+
+	// Reset terminal for all active sessions before shutdown
+	state.mu.RLock()
+	if state.masterConn != nil {
+		resetTerminal(state.masterConn)
+	}
+	for _, player := range state.players {
+		if player.session != nil {
+			resetTerminal(player.session)
+		}
+	}
+	state.mu.RUnlock()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer func() { cancel() }()
 	if err := s.Shutdown(ctx); err != nil && !errors.Is(err, ssh.ErrServerClosed) {

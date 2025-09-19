@@ -54,24 +54,14 @@ func resetTerminal(s ssh.Session) {
 
 // Catppuccin Mocha colors
 const (
-	catppuccinRosewater = "#f5e0dc"
-	catppuccinFlamingo  = "#f2cdcd"
-	catppuccinPink      = "#f5c2e7"
-	catppuccinMauve     = "#cba6f7"
-	catppuccinRed       = "#f38ba8"
-	catppuccinMaroon    = "#eba0ac"
-	catppuccinPeach     = "#fab387"
-	catppuccinYellow    = "#f9e2af"
-	catppuccinGreen     = "#a6e3a1"
-	catppuccinTeal      = "#94e2d5"
-	catppuccinSky       = "#89dceb"
-	catppuccinSapphire  = "#74c7ec"
-	catppuccinBlue      = "#89b4fa"
-	catppuccinLavender  = "#b4befe"
-	catppuccinText      = "#cdd6f4"
-	catppuccinCrust     = "#11111b"
-	catppuccinSubtext0  = "#a6adc8"
-	catppuccinOverlay1  = "#7f849c"
+	catppuccinMauve    = "#cba6f7"
+	catppuccinMaroon   = "#eba0ac"
+	catppuccinPeach    = "#fab387"
+	catppuccinSky      = "#89dceb"
+	catppuccinBlue     = "#89b4fa"
+	catppuccinLavender = "#b4befe"
+	catppuccinCrust    = "#11111b"
+	catppuccinOverlay1 = "#7f849c"
 )
 
 // Shared styles for statistics display
@@ -139,6 +129,7 @@ func calculateStatistics(points []string) (float64, string, map[string]int) {
 	return average, median, distribution
 }
 
+// Give an overview to all players what the scores are
 func showFinalVotes(points []string, voted int) string {
 	var s strings.Builder
 
@@ -201,7 +192,6 @@ type playerState struct {
 var (
 	// some style colouring
 	focusStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(catppuccinMauve))
-	timerStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(catppuccinSubtext0)).Render
 	helpStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color(catppuccinOverlay1)).Render
 )
 

@@ -22,6 +22,9 @@ builds:
       - linux
       - windows
       - darwin
+    ldflags:
+      - -X main.Version={{.Version}}
+      - -X main.CommitSHA={{.ShortCommit}}
 
 archives:
   - format: tar.gz

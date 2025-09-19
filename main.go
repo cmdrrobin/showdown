@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
@@ -26,26 +27,41 @@ import (
 	gossh "golang.org/x/crypto/ssh"
 )
 
+const shaLen = 7
+
+// Build-time variables set by -ldflags
+var (
+	// Version contains the application Version number. It's set via ldflags
+	// when building.
+	Version = "dev"
+
+	// CommitSHA contains the SHA of the commit that this application was built
+	// against. It's set via ldflags when building.
+	CommitSHA = "unknown"
+)
+
+// resetTerminal sends ANSI escape sequences to reset terminal state
+func resetTerminal(s ssh.Session) {
+	// Exit alternate screen buffer
+	s.Write([]byte("\033[?1049l"))
+	// Show cursor
+	s.Write([]byte("\033[?25h"))
+	// Reset terminal to initial state
+	s.Write([]byte("\033c"))
+	// Clear screen and move cursor to home
+	s.Write([]byte("\033[2J\033[H"))
+}
+
 // Catppuccin Mocha colors
 const (
-	catppuccinRosewater = "#f5e0dc"
-	catppuccinFlamingo  = "#f2cdcd"
-	catppuccinPink      = "#f5c2e7"
-	catppuccinMauve     = "#cba6f7"
-	catppuccinRed       = "#f38ba8"
-	catppuccinMaroon    = "#eba0ac"
-	catppuccinPeach     = "#fab387"
-	catppuccinYellow    = "#f9e2af"
-	catppuccinGreen     = "#a6e3a1"
-	catppuccinTeal      = "#94e2d5"
-	catppuccinSky       = "#89dceb"
-	catppuccinSapphire  = "#74c7ec"
-	catppuccinBlue      = "#89b4fa"
-	catppuccinLavender  = "#b4befe"
-	catppuccinText      = "#cdd6f4"
-	catppuccinCrust     = "#11111b"
-	catppuccinSubtext0  = "#a6adc8"
-	catppuccinOverlay1  = "#7f849c"
+	catppuccinMauve    = "#cba6f7"
+	catppuccinMaroon   = "#eba0ac"
+	catppuccinPeach    = "#fab387"
+	catppuccinSky      = "#89dceb"
+	catppuccinBlue     = "#89b4fa"
+	catppuccinLavender = "#b4befe"
+	catppuccinCrust    = "#11111b"
+	catppuccinOverlay1 = "#7f849c"
 )
 
 // Shared styles for statistics display
@@ -113,6 +129,7 @@ func calculateStatistics(points []string) (float64, string, map[string]int) {
 	return average, median, distribution
 }
 
+// Give an overview to all players what the scores are
 func showFinalVotes(points []string, voted int) string {
 	var s strings.Builder
 
@@ -175,7 +192,6 @@ type playerState struct {
 var (
 	// some style colouring
 	focusStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(catppuccinMauve))
-	timerStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(catppuccinSubtext0)).Render
 	helpStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color(catppuccinOverlay1)).Render
 )
 
@@ -231,6 +247,9 @@ func sessionCloseMiddleware() wish.Middleware {
 			// Run the handler (this blocks until session ends)
 			h(s)
 
+			// Reset terminal state before session closes
+			resetTerminal(s)
+
 			// After session ends, check if it was the master connection
 			state.mu.Lock()
 			defer state.mu.Unlock()
@@ -243,6 +262,18 @@ func sessionCloseMiddleware() wish.Middleware {
 }
 
 func main() {
+	if Version == "" {
+		if info, ok := debug.ReadBuildInfo(); ok && info.Main.Sum != "" {
+			Version = info.Main.Version
+		} else {
+			Version = "unknown (built from source)"
+		}
+	}
+	version := Version
+	if len(CommitSHA) >= shaLen {
+		version += " (" + CommitSHA[:shaLen] + ")"
+	}
+
 	// define flag for custom port
 	port := flag.Int("p", 23234, "SSH server port")
 	// Parse all declared flags
@@ -283,7 +314,7 @@ func main() {
 	// Open SSH listerner and serve SSH. Make it possible to stop the service
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-	log.Info("Starting Showdown server", "host", host, "port", *port)
+	log.Info("Starting Showdown server", "host", host, "port", *port, "version", version)
 	go func() {
 		if err = s.ListenAndServe(); err != nil && !errors.Is(err, ssh.ErrServerClosed) {
 			log.Error("Could not start server", "error", err)
@@ -293,6 +324,19 @@ func main() {
 
 	<-done
 	log.Info("Stopping Showdown server")
+
+	// Reset terminal for all active sessions before shutdown
+	state.mu.RLock()
+	if state.masterConn != nil {
+		resetTerminal(state.masterConn)
+	}
+	for _, player := range state.players {
+		if player.session != nil {
+			resetTerminal(player.session)
+		}
+	}
+	state.mu.RUnlock()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer func() { cancel() }()
 	if err := s.Shutdown(ctx); err != nil && !errors.Is(err, ssh.ErrServerClosed) {

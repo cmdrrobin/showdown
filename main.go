@@ -40,7 +40,9 @@ var (
 	CommitSHA = "unknown"
 )
 
-// resetTerminal sends ANSI escape sequences to reset terminal state
+// resetTerminal sends ANSI escape sequences to reset the terminal state for a
+// given SSH session. It exits alternate screen buffer, shows the cursor, resets
+// terminal to initial state, and clears the screen.
 func resetTerminal(s ssh.Session) {
 	// Exit alternate screen buffer
 	s.Write([]byte("\033[?1049l"))
@@ -80,16 +82,20 @@ var (
 			Foreground(lipgloss.Color(catppuccinSky))
 )
 
-// Shared types and functions for tick updates
+// tickMsg represents a periodic tick message used for UI updates.
 type tickMsg time.Time
 
+// tickEvery returns a Bubble Tea command that sends a tickMsg every second.
+// This enables periodic UI refreshes for both master and player views.
 func tickEvery() tea.Cmd {
 	return tea.Every(time.Second, func(t time.Time) tea.Msg {
 		return tickMsg(t)
 	})
 }
 
-// Shared functions for statistics calculation and display
+// calculateStatistics computes voting statistics from a slice of point values.
+// It returns the average (for numeric values), median, and a distribution map
+// showing how many times each point value was selected.
 func calculateStatistics(points []string) (float64, string, map[string]int) {
 	var numericPoints []float64
 	distribution := make(map[string]int)
@@ -129,7 +135,9 @@ func calculateStatistics(points []string) (float64, string, map[string]int) {
 	return average, median, distribution
 }
 
-// Give an overview to all players what the scores are
+// showFinalVotes renders a formatted string displaying voting statistics including
+// average, median, and a visual distribution with progress bars for each point value.
+// It takes the list of voted points and total vote count as parameters.
 func showFinalVotes(points []string, voted int) string {
 	var s strings.Builder
 
@@ -173,7 +181,8 @@ func showFinalVotes(points []string, voted int) string {
 	return s.String()
 }
 
-// Information about game state for Scrum Master view
+// gameState holds the shared state for a Scrum Poker session, including all
+// connected players, reveal status, and the master connection reference.
 type gameState struct {
 	players    map[string]*playerState
 	revealed   bool
@@ -181,7 +190,8 @@ type gameState struct {
 	masterConn ssh.Session
 }
 
-// Information about a player
+// playerState holds the state for an individual player including their selected
+// points, SSH session reference, and whether they have made a selection.
 type playerState struct {
 	points   string
 	session  ssh.Session
@@ -195,7 +205,9 @@ var (
 	helpStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color(catppuccinOverlay1)).Render
 )
 
-// Validate SSH public key with defined authorized keys
+// checkAuthorizedKey validates whether the SSH session's public key matches
+// any key in the .ssh/showdown_keys file. Returns true if the key is authorized,
+// which grants Scrum Master privileges to the connecting user.
 func checkAuthorizedKey(s ssh.Session) bool {
 	pubKey := s.PublicKey()
 	if pubKey == nil {
@@ -218,7 +230,9 @@ func checkAuthorizedKey(s ssh.Session) bool {
 	return ssh.KeysEqual(parsedKeys, pubKey)
 }
 
-// Default Scrum Poker handler
+// pokerHandler is the main Bubble Tea handler for SSH connections. It determines
+// whether to show the Scrum Master view (for authorized keys when no master exists)
+// or the player name input view for regular participants.
 func pokerHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 	_, _, active := s.Pty()
 	if !active {
@@ -240,7 +254,9 @@ func pokerHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 	return initialNameInputView(s), []tea.ProgramOption{tea.WithAltScreen()}
 }
 
-// Middleware to handle session closure and reset masterConn if needed
+// sessionCloseMiddleware returns a Wish middleware that handles SSH session cleanup.
+// It resets the terminal state when sessions close and clears the master connection
+// reference if the disconnecting session was the Scrum Master.
 func sessionCloseMiddleware() wish.Middleware {
 	return func(h ssh.Handler) ssh.Handler {
 		return func(s ssh.Session) {
@@ -261,6 +277,10 @@ func sessionCloseMiddleware() wish.Middleware {
 	}
 }
 
+// main is the application entry point. It initializes version information from
+// build flags or runtime, parses command-line flags for port configuration,
+// creates and starts the SSH server with authentication and middleware, and
+// handles graceful shutdown on interrupt signals.
 func main() {
 	if Version == "" {
 		if info, ok := debug.ReadBuildInfo(); ok && info.Main.Sum != "" {

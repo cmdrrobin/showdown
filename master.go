@@ -12,6 +12,8 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// keyMapMaster defines the key bindings available to the Scrum Master,
+// including reveal, clear, disconnect, quit, and timer controls.
 type keyMapMaster struct {
 	Reveal     key.Binding
 	Clear      key.Binding
@@ -67,6 +69,8 @@ var (
 	// Styles moved to main.go for shared access
 )
 
+// masterView is the Bubble Tea model for the Scrum Master interface, displaying
+// connected players, voting status, timer countdown, and voting statistics.
 type masterView struct {
 	revealed bool
 	timer    *time.Timer
@@ -76,14 +80,14 @@ type masterView struct {
 	help     help.Model
 }
 
-// Add timer control messages
-type (
-	timerExpiredMsg struct{}
-)
+// timerExpiredMsg is sent when the voting timer reaches zero, triggering
+// automatic reveal of all player votes.
+type timerExpiredMsg struct{}
 
 // tickMsg and tickEvery moved to main.go for shared access
 
-// set some default values for masterView and by default show help information
+// newMasterView creates and initializes a new Scrum Master view with default
+// settings. The help panel is expanded by default to show all available commands.
 func newMasterView() masterView {
 	m := masterView{
 		revealed: false,
@@ -111,12 +115,14 @@ func (k keyMapMaster) FullHelp() [][]key.Binding {
 	}
 }
 
-// tickEvery function moved to main.go
-
+// Init initializes the master view and starts the periodic tick command
+// for UI updates. Implements the tea.Model interface.
 func (m masterView) Init() tea.Cmd {
 	return tea.Batch(tickEvery())
 }
 
+// startTimer returns a Bubble Tea command that waits for the specified duration
+// and then sends a timerExpiredMsg to trigger automatic vote reveal.
 func startTimer(duration time.Duration) tea.Cmd {
 	return func() tea.Msg {
 		time.Sleep(duration)
@@ -124,9 +130,8 @@ func startTimer(duration time.Duration) tea.Cmd {
 	}
 }
 
-// calculateStatistics function moved to main.go for shared access
-
-// Quit all team player sessions
+// quitPlayers disconnects all connected player sessions by resetting their
+// terminals and closing their SSH connections, then clears the players map.
 func quitPlayers() {
 	for _, player := range state.players {
 		// Reset terminal before closing session
@@ -136,7 +141,8 @@ func quitPlayers() {
 	state.players = make(map[string]*playerState)
 }
 
-// To clear revealing and points of players
+// clearPlayerState resets the game state for a new voting round by clearing
+// the revealed flag and resetting all player selections and points.
 func clearPlayerState() {
 	state.mu.Lock()
 	state.revealed = false
@@ -147,6 +153,9 @@ func clearPlayerState() {
 	state.mu.Unlock()
 }
 
+// Update handles all incoming messages for the master view including keyboard
+// input for reveal/clear/disconnect/quit actions, timer key presses, window
+// resize events, and timer expiration. Implements the tea.Model interface.
 func (m masterView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -205,8 +214,9 @@ func (m masterView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// showFinalVotes function moved to main.go for shared access
-
+// View renders the Scrum Master dashboard showing the timer (if active),
+// list of connected players with their voting status, voting progress,
+// and statistics when votes are revealed. Implements the tea.Model interface.
 func (m masterView) View() string {
 	state.mu.RLock()
 	defer state.mu.RUnlock()

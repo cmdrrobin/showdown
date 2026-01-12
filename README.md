@@ -1,6 +1,16 @@
 # Showdown - Scrum Poker Game
 
-Showdown is Scrum Poker game written in Go. The name Showdown reference to the last reveal in a poker game.
+Showdown is a collaborative estimation tool written in Go and used in
+Agile/Scrum development where team members vote on story point estimates during
+sprint planning. The name "Showdown" refers to the final reveal in a poker game,
+similar to how votes are revealed simultaneously in planning poker.
+
+It runs as a SSH server (default port `23234`) that team members can connect to
+using their terminal application. Scrum Master is authorized via SSH key
+(`.ssh/showdown_keys`), and controls the game, reveals votes and resets rounds.
+Each player can connect (without a key) to the game and select storypoints.
+
+## Demo
 
 ![Showdown view of Scrum Master](./images/showdown-master.gif)
 

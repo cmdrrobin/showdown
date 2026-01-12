@@ -161,11 +161,11 @@ func (p playerView) showResults() string {
 	for _, name := range names {
 		player := state.players[name]
 		if player.selected {
-			s.WriteString(fmt.Sprintf("• %s: %s\n", name, player.points))
+			fmt.Fprintf(&s, "• %s: %s\n", name, player.points)
 			points = append(points, player.points)
 			voted++
 		} else {
-			s.WriteString(fmt.Sprintf("• %s: no vote\n", name))
+			fmt.Fprintf(&s, "• %s: no vote\n", name)
 		}
 	}
 
@@ -181,7 +181,7 @@ func (p playerView) showResults() string {
 // (during voting) or the results panel (after reveal). Implements the tea.Model interface.
 func (p playerView) View() string {
 	var s strings.Builder
-	s.WriteString(fmt.Sprintf("🎲 Showdown - Player: %s\n\n", p.name))
+	fmt.Fprintf(&s, "🎲 Showdown - Player: %s\n\n", p.name)
 
 	state.mu.RLock()
 	revealed := state.revealed
@@ -192,7 +192,7 @@ func (p playerView) View() string {
 	} else {
 		s.WriteString(p.list.View() + "\n\n")
 		if p.selected != "" {
-			s.WriteString(fmt.Sprintf("Selected: %s\n", p.selected))
+			fmt.Fprintf(&s, "Selected: %s\n", p.selected)
 		}
 	}
 

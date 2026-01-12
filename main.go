@@ -150,9 +150,9 @@ func showFinalVotes(points []string, voted int) string {
 
 	s.WriteString("\n📊 Voting Statistics:\n")
 	if avg > 0 {
-		s.WriteString(fmt.Sprintf("Average: %.1f\n", avg))
+		fmt.Fprintf(&s, "Average: %.1f\n", avg)
 	}
-	s.WriteString(fmt.Sprintf("Median: %s\n", median))
+	fmt.Fprintf(&s, "Median: %s\n", median)
 
 	s.WriteString("Distribution:\n")
 	// Sort point values for consistent display
@@ -171,7 +171,7 @@ func showFinalVotes(points []string, voted int) string {
 		percent := percentStyle.Render(fmt.Sprintf("(%.1f%%)", percentage*100))
 
 		// Add the point value and vote count
-		s.WriteString(fmt.Sprintf("%s %s %s\n", label, votes, percent))
+		fmt.Fprintf(&s, "%s %s %s\n", label, votes, percent)
 
 		// Add the progress bar
 		s.WriteString(p.ViewAs(percentage))

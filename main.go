@@ -8,13 +8,16 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"regexp"
 	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
+	"unicode"
 
 	"github.com/charmbracelet/bubbles/progress"
 	tea "github.com/charmbracelet/bubbletea"
@@ -27,7 +30,22 @@ import (
 	gossh "golang.org/x/crypto/ssh"
 )
 
-const shaLen = 7
+const (
+	shaLen = 7
+
+	// Connection and resource limits
+	maxConnections      = 100
+	maxConnectionsPerIP = 10
+	maxPlayers          = 15
+	sessionTimeout      = 30 * time.Minute
+
+	// Player name validation
+	minNameLength = 2
+	maxNameLength = 20
+)
+
+// validNameRegex allows only alphanumeric characters, spaces, hyphens, and underscores
+var validNameRegex = regexp.MustCompile(`^[a-zA-Z0-9 _-]+$`)
 
 // Build-time variables set by -ldflags
 var (
@@ -39,6 +57,61 @@ var (
 	// against. It's set via ldflags when building.
 	CommitSHA = "unknown"
 )
+
+// Connection tracking for DoS protection
+var (
+	connectionCount atomic.Int32
+	connectionsByIP sync.Map // map[string]*atomic.Int32
+	reservedNames   = []string{"master", "admin", "system", "server", "scrum", "poker"}
+)
+
+// getConfigPath returns an absolute path for configuration files.
+// It uses the current working directory as the base to ensure consistent
+// path resolution regardless of how the application is started.
+func getConfigPath(filename string) (string, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("failed to get working directory: %w", err)
+	}
+	return fmt.Sprintf("%s/.ssh/%s", cwd, filename), nil
+}
+
+// validatePlayerName performs comprehensive validation on player names to prevent
+// injection attacks, control character exploits, and ensure usability.
+func validatePlayerName(name string) error {
+	// Trim whitespace
+	name = strings.TrimSpace(name)
+
+	// Check length
+	if len(name) < minNameLength {
+		return fmt.Errorf("name must be at least %d characters", minNameLength)
+	}
+	if len(name) > maxNameLength {
+		return fmt.Errorf("name must be at most %d characters", maxNameLength)
+	}
+
+	// Check for valid characters only
+	if !validNameRegex.MatchString(name) {
+		return fmt.Errorf("name contains invalid characters (use only letters, numbers, spaces, - or _)")
+	}
+
+	// Check for control characters and ANSI escapes
+	for _, r := range name {
+		if unicode.IsControl(r) {
+			return fmt.Errorf("name contains control characters")
+		}
+	}
+
+	// Prevent reserved names
+	lowerName := strings.ToLower(name)
+	for _, reserved := range reservedNames {
+		if lowerName == reserved {
+			return fmt.Errorf("name '%s' is reserved", name)
+		}
+	}
+
+	return nil
+}
 
 // resetTerminal sends ANSI escape sequences to reset the terminal state for a
 // given SSH session. It exits alternate screen buffer, shows the cursor, resets
@@ -215,19 +288,34 @@ func checkAuthorizedKey(s ssh.Session) bool {
 		return false
 	}
 
-	authorizedKeys, err := os.ReadFile(".ssh/showdown_keys")
+	authorizedKeysPath, err := getConfigPath("showdown_keys")
 	if err != nil {
-		log.Error("failed to read authorized_keys", "error", err)
+		log.Error("failed to resolve authorized_keys path", "error", err)
 		return false
 	}
 
-	parsedKeys, _, _, _, err := ssh.ParseAuthorizedKey(authorizedKeys)
+	authorizedKeys, err := os.ReadFile(authorizedKeysPath)
 	if err != nil {
-		log.Error("failed to parse authorized_keys", "error", err)
+		log.Error("failed to read authorized_keys", "error", err, "path", authorizedKeysPath)
 		return false
 	}
 
-	return ssh.KeysEqual(parsedKeys, pubKey)
+	// Parse all keys in the file, not just the first one
+	for len(authorizedKeys) > 0 {
+		parsedKey, _, _, rest, err := ssh.ParseAuthorizedKey(authorizedKeys)
+		if err != nil {
+			// Stop on parse error
+			break
+		}
+
+		if ssh.KeysEqual(parsedKey, pubKey) {
+			return true
+		}
+
+		authorizedKeys = rest
+	}
+
+	return false
 }
 
 // pokerHandler is the main Bubble Tea handler for SSH connections. It determines
@@ -236,22 +324,89 @@ func checkAuthorizedKey(s ssh.Session) bool {
 func pokerHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 	_, _, active := s.Pty()
 	if !active {
-		wish.Fatalln(s, "no active terminal, sipping")
+		wish.Fatalln(s, "no active terminal, skipping")
 		return nil, nil
 	}
 
 	// Check if the connection has valid authorized key
 	if checkAuthorizedKey(s) {
-		// Set Scrum Master connection view when there is none.
+		// Set Scrum Master connection view when there is none (thread-safe).
+		state.mu.Lock()
 		if state.masterConn == nil {
 			state.masterConn = s
+			state.mu.Unlock()
+			log.Info("Scrum Master connected", "user", s.User())
 			return newMasterView(), []tea.ProgramOption{tea.WithAltScreen()}
 		}
+		state.mu.Unlock()
+
+		// If master already exists, deny connection
+		wish.Fatalln(s, "Scrum Master is already connected")
+		return nil, nil
 	}
 
 	// Setup Player connection view
 	// TODO: better naming functions
 	return initialNameInputView(s), []tea.ProgramOption{tea.WithAltScreen()}
+}
+
+// connectionLimitMiddleware enforces global and per-IP connection limits to prevent DoS attacks.
+func connectionLimitMiddleware() wish.Middleware {
+	return func(h ssh.Handler) ssh.Handler {
+		return func(s ssh.Session) {
+			// Global limit check
+			if connectionCount.Load() >= maxConnections {
+				wish.Fatalln(s, fmt.Sprintf("Server at capacity (%d connections), please try again later", maxConnections))
+				return
+			}
+			connectionCount.Add(1)
+			defer connectionCount.Add(-1)
+
+			// Per-IP limit check
+			clientIP := s.RemoteAddr().String()
+			// Extract just the IP without port
+			if host, _, err := net.SplitHostPort(clientIP); err == nil {
+				clientIP = host
+			}
+
+			ipCountI, _ := connectionsByIP.LoadOrStore(clientIP, &atomic.Int32{})
+			ipCount := ipCountI.(*atomic.Int32)
+
+			if ipCount.Load() >= maxConnectionsPerIP {
+				wish.Fatalln(s, "Too many connections from your IP address")
+				return
+			}
+			ipCount.Add(1)
+			defer ipCount.Add(-1)
+
+			h(s)
+		}
+	}
+}
+
+// sessionTimeoutMiddleware enforces a maximum session duration to prevent resource leaks.
+func sessionTimeoutMiddleware() wish.Middleware {
+	return func(h ssh.Handler) ssh.Handler {
+		return func(s ssh.Session) {
+			ctx, cancel := context.WithTimeout(s.Context(), sessionTimeout)
+			defer cancel()
+
+			done := make(chan struct{})
+			go func() {
+				h(s)
+				close(done)
+			}()
+
+			select {
+			case <-done:
+				// Session ended normally
+			case <-ctx.Done():
+				log.Info("Session timeout", "user", s.User(), "remote", s.RemoteAddr())
+				resetTerminal(s)
+				s.Close()
+			}
+		}
+	}
 }
 
 // sessionCloseMiddleware returns a Wish middleware that handles SSH session cleanup.
@@ -307,10 +462,16 @@ func main() {
 	// Convert port into string
 	portStr := strconv.Itoa(*port)
 
+	// Get absolute path for host key
+	hostKeyPath, err := getConfigPath("showdown_ed25519")
+	if err != nil {
+		log.Fatal("failed to resolve host key path", "error", err)
+	}
+
 	// create SSH server
 	s, err := wish.NewServer(
 		wish.WithAddress(net.JoinHostPort(host, portStr)),
-		wish.WithHostKeyPath(".ssh/showdown_ed25519"),
+		wish.WithHostKeyPath(hostKeyPath),
 		wish.WithPublicKeyAuth(func(ctx ssh.Context, key ssh.PublicKey) bool {
 			// Allow connections with any ed25519 key
 			return key != nil && key.Type() == "ssh-ed25519"
@@ -322,6 +483,8 @@ func main() {
 			return true
 		}),
 		wish.WithMiddleware(
+			connectionLimitMiddleware(),
+			sessionTimeoutMiddleware(),
 			bubbletea.Middleware(pokerHandler),
 			logging.Middleware(),
 			sessionCloseMiddleware(),

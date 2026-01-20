@@ -293,18 +293,31 @@ func (v nameInputView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyEnter:
-			name := v.textInput.Value()
-			if name == "" {
-				v.err = fmt.Errorf("name cannot be empty")
+			name := strings.TrimSpace(v.textInput.Value())
+
+			// Validate player name
+			if err := validatePlayerName(name); err != nil {
+				v.err = err
 				return v, nil
 			}
+
 			state.mu.RLock()
 			_, exists := state.players[name]
+			playerCount := len(state.players)
 			state.mu.RUnlock()
+
+			// Check if name is already taken
 			if exists {
 				v.err = fmt.Errorf("name already taken")
 				return v, nil
 			}
+
+			// Check player limit
+			if playerCount >= maxPlayers {
+				v.err = fmt.Errorf("game is full (maximum %d players)", maxPlayers)
+				return v, nil
+			}
+
 			return initPlayerView(name, v.session)
 		case tea.KeyCtrlC:
 			return v, tea.Quit

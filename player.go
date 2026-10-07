@@ -5,12 +5,12 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/list"
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/ssh"
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/list"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	"charm.land/ssh"
 )
 
 // pointOptions defines the available story point values that players can select
@@ -112,7 +112,7 @@ func (p playerView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "q", "esc", "ctrl+c":
 			state.mu.Lock()
@@ -179,7 +179,7 @@ func (p playerView) showResults() string {
 
 // View renders the player interface showing either the point selection list
 // (during voting) or the results panel (after reveal). Implements the tea.Model interface.
-func (p playerView) View() string {
+func (p playerView) View() tea.View {
 	var s strings.Builder
 	fmt.Fprintf(&s, "🎲 Showdown - Player: %s\n\n", p.name)
 
@@ -197,7 +197,7 @@ func (p playerView) View() string {
 	}
 
 	s.WriteString("\nPress q to quit")
-	return lipgloss.NewStyle().Padding(1).Render(s.String())
+	return newAltScreenView(lipgloss.NewStyle().Padding(1).Render(s.String()))
 }
 
 // additionalDelegateKeys creates a list delegate with custom key bindings for
@@ -263,13 +263,15 @@ func initPlayerView(playerName string, session ssh.Session) (tea.Model, tea.Cmd)
 // the session, with styled text input and a 30-character limit.
 func initialNameInputView(session ssh.Session) nameInputView {
 	ti := textinput.New()
-	ti.Cursor.Style = focusStyle
+	styles := ti.Styles()
+	styles.Cursor.Color = focusStyle.GetForeground()
+	styles.Focused.Prompt = focusStyle
+	styles.Focused.Text = focusStyle
+	ti.SetStyles(styles)
 	ti.Placeholder = "Enter your name"
 	ti.Focus()
-	ti.PromptStyle = focusStyle
-	ti.TextStyle = focusStyle
 	ti.CharLimit = 30
-	ti.Width = 30
+	ti.SetWidth(30)
 
 	return nameInputView{
 		textInput: ti,
@@ -290,9 +292,9 @@ func (v nameInputView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.Type {
-		case tea.KeyEnter:
+	case tea.KeyPressMsg:
+		switch msg.String() {
+		case "enter":
 			name := strings.TrimSpace(v.textInput.Value())
 
 			// Validate player name
@@ -319,7 +321,7 @@ func (v nameInputView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			return initPlayerView(name, v.session)
-		case tea.KeyCtrlC:
+		case "ctrl+c":
 			return v, tea.Quit
 		}
 	case tickMsg:
@@ -332,7 +334,7 @@ func (v nameInputView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // View renders the welcome screen with the name input field, help text,
 // and any validation error messages. Implements the tea.Model interface.
-func (v nameInputView) View() string {
+func (v nameInputView) View() tea.View {
 	var s strings.Builder
 	s.WriteString("Welcome to Showdown!\n\n")
 	s.WriteString(v.textInput.View() + "\n\n")
@@ -340,5 +342,5 @@ func (v nameInputView) View() string {
 	if v.err != nil {
 		s.WriteString("\nError: " + v.err.Error() + "\n")
 	}
-	return lipgloss.NewStyle().Padding(1).Render(s.String())
+	return newAltScreenView(lipgloss.NewStyle().Padding(1).Render(s.String()))
 }

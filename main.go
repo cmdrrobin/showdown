@@ -19,14 +19,14 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/charmbracelet/bubbles/progress"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/log"
-	"github.com/charmbracelet/ssh"
-	"github.com/charmbracelet/wish"
-	"github.com/charmbracelet/wish/bubbletea"
-	"github.com/charmbracelet/wish/logging"
+	"charm.land/bubbles/v2/progress"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	"charm.land/log/v2"
+	"charm.land/ssh"
+	"charm.land/wish/v2"
+	"charm.land/wish/v2/bubbletea"
+	"charm.land/wish/v2/logging"
 	gossh "golang.org/x/crypto/ssh"
 )
 
@@ -217,7 +217,8 @@ func showFinalVotes(points []string, voted int) string {
 	avg, median, distribution := calculateStatistics(points)
 
 	p := progress.New(
-		progress.WithScaledGradient(catppuccinMaroon, catppuccinLavender),
+		progress.WithColors(lipgloss.Color(catppuccinMaroon), lipgloss.Color(catppuccinLavender)),
+		progress.WithScaled(true),
 		progress.WithWidth(50),
 	)
 
@@ -336,7 +337,7 @@ func pokerHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 			state.masterConn = s
 			state.mu.Unlock()
 			log.Info("Scrum Master connected", "user", s.User())
-			return newMasterView(), []tea.ProgramOption{tea.WithAltScreen()}
+			return newMasterView(), nil
 		}
 		state.mu.Unlock()
 
@@ -347,7 +348,15 @@ func pokerHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 
 	// Setup Player connection view
 	// TODO: better naming functions
-	return initialNameInputView(s), []tea.ProgramOption{tea.WithAltScreen()}
+	return initialNameInputView(s), nil
+}
+
+// newAltScreenView wraps rendered content in a tea.View that uses the
+// alternate screen buffer.
+func newAltScreenView(content string) tea.View {
+	v := tea.NewView(content)
+	v.AltScreen = true
+	return v
 }
 
 // connectionLimitMiddleware enforces global and per-IP connection limits to prevent DoS attacks.

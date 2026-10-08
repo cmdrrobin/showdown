@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/help"
-	"github.com/charmbracelet/bubbles/key"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/help"
+	"charm.land/bubbles/v2/key"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 // keyMapMaster defines the key bindings available to the Scrum Master,
@@ -161,9 +161,9 @@ func (m masterView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		// If we set a width on the help menu it can gracefully truncate
 		// its view as needed.
-		m.help.Width = msg.Width
+		m.help.SetWidth(msg.Width)
 
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch {
 		case key.Matches(msg, m.keys.Quit):
 			quitPlayers()
@@ -217,7 +217,7 @@ func (m masterView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // View renders the Scrum Master dashboard showing the timer (if active),
 // list of connected players with their voting status, voting progress,
 // and statistics when votes are revealed. Implements the tea.Model interface.
-func (m masterView) View() string {
+func (m masterView) View() tea.View {
 	state.mu.RLock()
 	defer state.mu.RUnlock()
 
@@ -284,5 +284,5 @@ func (m masterView) View() string {
 	// show help menu
 	s.WriteString(fmt.Sprintf("\n%s", m.help.View(m.keys)))
 
-	return lipgloss.NewStyle().Padding(1).Render(s.String())
+	return newAltScreenView(lipgloss.NewStyle().Padding(1).Render(s.String()))
 }
